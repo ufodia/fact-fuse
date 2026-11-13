@@ -22,8 +22,7 @@ export interface Analysis {
 
 const words = (s: string) => new Set((s.toLocaleLowerCase('en').match(/[\p{L}]+/gu) || []).filter(w => !['a','an','the','to','of','in','and','we','our','is','it','for'].includes(w)));
 const sentences = (s: string) => s.trim().split(/\n+|(?<=[.!?])\s+(?=[\p{Lu}])/u).map(s => s.trim()).filter(Boolean);
-const similarity = (a: string, b: string) => {
-  const x = words(a), y = words(b);
+const similarity = (a: string, b: string, x: Set<string>, y: Set<string>) => {
   if (!x.size || !y.size) return a === b ? 1 : 0;
   let common = 0; for (const w of x) if (y.has(w)) common++;
   return common / Math.max(x.size, y.size);
@@ -66,18 +65,20 @@ const bounds = (s: string) => /\b(?:at least|minimum|no fewer than|en az)\b/i.te
 
 /** Conservative, monotonic sentence alignment. Low-overlap pairs are left unmatched. */
 function align(a: string[], b: string[]): [number|null,number|null,number][] {
+  const aWords=a.map(words),bWords=b.map(words);
+  const score=(i:number,j:number)=>similarity(a[i],b[j],aWords[i],bWords[j]);
   const scores = Array.from({length:a.length+1},()=>Array(b.length+1).fill(0));
   const moves = Array.from({length:a.length+1},()=>Array<string>(b.length+1).fill(''));
   for(let i=1;i<=a.length;i++){scores[i][0]=-i*.2;moves[i][0]='a';}
   for(let j=1;j<=b.length;j++){scores[0][j]=-j*.2;moves[0][j]='b';}
   for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++){
-    const sim=similarity(a[i-1],b[j-1]);
+    const sim=score(i-1,j-1);
     const opts:[number,string][]=[[scores[i-1][j]-.2,'a'],[scores[i][j-1]-.2,'b']];
     if(sim>=.18)opts.push([scores[i-1][j-1]+sim,'pair']);
     opts.sort((x,y)=>y[0]-x[0]);[scores[i][j],moves[i][j]]=opts[0];
   }
   const pairs:[number|null,number|null,number][]=[];let i=a.length,j=b.length;
-  while(i||j){const m=moves[i][j];if(m==='pair'){pairs.push([--i,--j,similarity(a[i],b[j])]);}else if(m==='a'){pairs.push([--i,null,0]);}else{pairs.push([null,--j,0]);}}
+  while(i||j){const m=moves[i][j];if(m==='pair'){pairs.push([--i,--j,score(i,j)]);}else if(m==='a'){pairs.push([--i,null,0]);}else{pairs.push([null,--j,0]);}}
   return pairs.reverse();
 }
 

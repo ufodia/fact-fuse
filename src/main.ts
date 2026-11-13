@@ -17,6 +17,7 @@ const el=<T extends HTMLElement>(id:string)=>document.getElementById(id) as T;
 const source=el<HTMLTextAreaElement>('source'),rewrite=el<HTMLTextAreaElement>('rewrite'),locked=el<HTMLTextAreaElement>('locked');
 let report:Analysis|null=null;
 let reviewed=new Set<string>();
+const importVersions:Record<string,number>={source:0,rewrite:0};
 const labels:Record<string,string>={number:'QUANTITY',date:'DATE',link:'LINK',negation:'NEGATION',commitment:'COMMITMENT',bound:'THRESHOLD',locked:'PROTECTED WORDING',coverage:'COVERAGE'};
 
 function render(){
@@ -42,11 +43,11 @@ function render(){
   }
 }
 function compare(){try{report=analyze(source.value,rewrite.value,locked.value.split(/\r?\n/));reviewed=new Set();el('error').hidden=true;el<HTMLButtonElement>('export').disabled=false;render();}catch(e){el('error').textContent=e instanceof Error?e.message:String(e);el('error').hidden=false;}}
-function sample(key:keyof typeof samples){const s=samples[key];source.value=s.source;rewrite.value=s.rewrite;locked.value=s.locked.join('\n');compare();}
+function sample(key:keyof typeof samples){importVersions.source++;importVersions.rewrite++;const s=samples[key];source.value=s.source;rewrite.value=s.rewrite;locked.value=s.locked.join('\n');compare();}
 function stale(){report=null;reviewed.clear();el<HTMLButtonElement>('export').disabled=true;el('open-count').textContent='—';el('summary-copy').textContent='Drafts changed. Compare again to update the review.';el('findings').replaceChildren();const n=document.createElement('div');n.className='empty';n.textContent='Compare again to review your updated drafts.';el('findings').append(n);}
-for(const input of [source,rewrite,locked])input.addEventListener('input',stale);
+for(const input of [source,rewrite,locked])input.addEventListener('input',()=>{if(input!==locked)importVersions[input.id]++;stale();});
 el('compare').onclick=compare;el('filter').onchange=render;
 el<HTMLSelectElement>('sample').onchange=e=>sample((e.target as HTMLSelectElement).value as keyof typeof samples);
-for(const field of ['source','rewrite'])el<HTMLInputElement>(`${field}-file`).onchange=async e=>{const input=e.target as HTMLInputElement;const f=input.files?.[0];if(!f)return;try{if(f.size>500000)throw new Error('Text imports must be 500 KB or smaller.');el<HTMLTextAreaElement>(field).value=await f.text();stale();}catch(e){el('error').hidden=false;el('error').textContent=e instanceof Error?e.message:String(e);}input.value='';};
+for(const field of ['source','rewrite'])el<HTMLInputElement>(`${field}-file`).onchange=async e=>{const input=e.target as HTMLInputElement;const f=input.files?.[0];if(!f)return;const version=++importVersions[field];input.value='';try{if(f.size>500000)throw new Error('Text imports must be 500 KB or smaller.');const text=await f.text();if(version!==importVersions[field])return;el<HTMLTextAreaElement>(field).value=text;stale();el('error').hidden=true;}catch(e){if(version!==importVersions[field])return;el('error').hidden=false;el('error').textContent=e instanceof Error?e.message:String(e);}};
 el('export').onclick=()=>{if(!report)return;const blob=new Blob([JSON.stringify({...report,reviewed:[...reviewed]},null,2)+'\n'],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='fact-fuse-review.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 sample('proposal');

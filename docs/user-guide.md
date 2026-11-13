@@ -4,6 +4,8 @@
 
 The source should be the version you approved, not a second AI-generated revision. Paste it into **Original source**. Paste the received rewrite into **AI rewrite**. You can import UTF-8 `.txt` or `.md` files up to 500 KB; the comparison itself accepts up to 120,000 characters and 400 sentences per draft.
 
+Typing in a field, selecting another file for that field, or loading a sample supersedes any unfinished import for the same content. An older file read will not overwrite that newer work.
+
 ## Protect exact wording
 
 Put each phrase on its own line. Exact wording is case-sensitive and Unicode-normalized to NFC. A phrase missing from the source produces a review finding. Up to 50 distinct, non-empty phrases are considered. Protected wording is an exact-text check, not a semantic lock inside the AI provider.
