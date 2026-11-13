@@ -4,6 +4,9 @@
 
 <p align="center"><a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-334b35"></a> <img alt="Runs locally" src="https://img.shields.io/badge/data-stays_local-e44c2d"> <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178c6"> <a href="https://buymeacoffee.com/ufodia"><img src="docs/assets/coffee-button.svg" alt="Buy Ufodia a coffee" height="28"></a></p>
 
+
+**[Open the live app ↗](https://fact-fuse.vercel.app/)** · [Deployment guide](docs/DEPLOYMENT.md)
+
 ## The problem hiding inside a better sentence
 
 You ask an assistant to make a proposal sound more professional. It changes **“we may deliver up to 500 units”** to **“we will deliver at least 500 units.”** The grammar improved. The agreement changed.
