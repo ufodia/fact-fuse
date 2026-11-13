@@ -1,0 +1,27 @@
+{
+  "name": "fact-fuse",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A local workbench for reviewing factual drift in AI rewrites.",
+  "license": "MIT",
+  "author": "Ufodia",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test && npm run build",
+    "analyze": "tsx src/cli.ts",
+    "test:browser": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0",
+    "@types/node": "24.10.1",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vite": "8.3.8",
+    "vitest": "5.1.0"
+  }
+}
