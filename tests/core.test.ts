@@ -8,6 +8,25 @@ describe('Fact Fuse',()=>{
   it('does not treat swapped ambiguous separators as proven equivalence',()=>{const r=analyze('The distance is 1,234 km.','The distance is 1.234 km.');expect(r.findings.some(f=>f.kind==='number'&&f.severity==='review')).toBe(true);});
   it('does not flag an unchanged ambiguous numeric literal',()=>expect(analyze('The distance is 1.234 km.','The distance is 1.234 km.').findings).toHaveLength(0));
   it('accepts explicitly disambiguated and space-grouped equivalents',()=>{for(const value of ['1.250,00','1 250','1\u00a0250','1\u202f250'])expect(analyze('The distance is 1,250.00 km.',`The distance is ${value} km.`).findings).toHaveLength(0);});
+  it('preserves integer and decimal precision beyond JavaScript Number limits',()=>{
+    for(const [source,rewrite] of [
+      ['The amount is 9007199254740992 units.','The amount is 9007199254740993 units.'],
+      ['The amount is -9007199254740992 units.','The amount is -9007199254740993 units.'],
+      ['The amount is 1,000.0000000000000001 units.','The amount is 1000 units.'],
+      ['The amount is 0.00000000000000001 units.','The amount is 0 units.'],
+    ]) expect(analyze(source,rewrite).findings.some(f=>f.kind==='number'&&f.title==='Quantity changed')).toBe(true);
+    for(const [a,b] of [['9007199254740992.00','9007199254740992'],['-00012.3400','-12.34'],['-0.00','0']])expect(normalizeNumber(a)).toBe(normalizeNumber(b));
+  });
+  it('matches explicit percent forms but keeps different values and unit classes separate',()=>{
+    for(const value of ['10 percent','10 per cent','10 PERCENT','10 per\u00a0cent']){
+      expect(analyze('The tax rate is 10%.',`The tax rate is ${value}.`).findings.filter(f=>f.kind==='number')).toHaveLength(0);
+    }
+    for(const value of ['11 percent','10','10 percentage points','10 percent points','10 percent-point','10 percentages','10 percentile','10 cents']){
+      expect(analyze('The tax rate is 10%.',`The tax rate is ${value}.`).findings.some(f=>f.kind==='number')).toBe(true);
+    }
+    expect(analyze('The tax rate is 1,500%.','The tax rate is 1500 percent.').findings.some(f=>f.title==='Ambiguous number format')).toBe(true);
+    expect(analyze('The value is USD 10%.','The value is USD 10.').findings.some(f=>f.kind==='number')).toBe(true);
+  });
   it('does not merge unrelated numbers across line breaks',()=>expect(analyze('There are 1\n250 chairs.','There are 1250 chairs.').findings.length).toBeGreaterThan(0));
   it('tracks repeated values as a multiset',()=>{expect(analyze('The fee is $50 plus $50.','The fee is $50.').findings.some(f=>f.kind==='number')).toBe(true);});
   it('flags dropped negation and strengthened commitments',()=>{const r=analyze('We may deliver tomorrow. We do not charge a fee.','We will deliver tomorrow. We charge a fee.');expect(r.findings.map(f=>f.kind)).toContain('commitment');expect(r.findings.map(f=>f.kind)).toContain('negation');});

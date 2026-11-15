@@ -37,8 +37,14 @@ export function normalizeNumber(raw: string): string {
     if (/^[+-]?\d{1,3}([.,]\d{3})+$/.test(s)) s = s.replace(/[.,]/g, '');
     else s = s.replace(',', '.');
   }
-  const n = Number(s);
-  return Number.isFinite(n) ? String(n) : raw;
+  // Compare decimal strings exactly: JavaScript Number rounds integers beyond
+  // 2^53 and long fractions, which can silently erase a material difference.
+  const match = /^([+-]?)(\d+)(?:\.(\d+))?$/.exec(s);
+  if (!match) return raw;
+  const integer = match[2].replace(/^0+(?=\d)/, '');
+  const fraction = (match[3] || '').replace(/0+$/, '');
+  const negative = match[1] === '-' && (integer !== '0' || fraction !== '');
+  return `${negative ? '-' : ''}${integer}${fraction ? '.' + fraction : ''}`;
 }
 interface Value {key: string; raw: string; literal?: string; ambiguous?: boolean}
 function values(s: string, kind: 'number'|'date'|'link'): Value[] {
@@ -46,8 +52,10 @@ function values(s: string, kind: 'number'|'date'|'link'): Value[] {
   const datePattern = /\b(?:\d{4}-\d{2}-\d{2}|\d{1,2}[\/]\d{1,2}[\/]\d{4})\b/g;
   if (kind === 'date') return [...s.matchAll(datePattern)].map(m => ({key:m[0],raw:m[0]}));
   const clean = s.replace(/https?:\/\/[^\s<>"']+/g, '').replace(datePattern, '');
-  return [...clean.matchAll(/([$€£₺]|\b(?:USD|EUR|GBP|TRY))?\s*([+-]?(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)*))(?:\s*(%|USD\b|EUR\b|GBP\b|TRY\b|kg\b|mg\b|km\b|cm\b|mm\b|tonnes?\b|tons?\b|points?\b|upvotes?\b|hours?\b|days?\b|weeks?\b|months?\b|years?\b|items?\b|units?\b))?/gi)].map(m => {
-    const unit = ({'$':'USD','€':'EUR','£':'GBP','₺':'TRY'} as Record<string,string>)[m[1] || ''] || (m[1] || m[3] || '').toUpperCase().replace(/S$/, '');
+  return [...clean.matchAll(/([$€£₺]|\b(?:USD|EUR|GBP|TRY))?\s*([+-]?(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)*))(?:\s*(%|(?:percent|per[ \t\u00a0\u202f]+cent)\b(?![ \t\u00a0\u202f-]+points?\b)|USD\b|EUR\b|GBP\b|TRY\b|kg\b|mg\b|km\b|cm\b|mm\b|tonnes?\b|tons?\b|points?\b|upvotes?\b|hours?\b|days?\b|weeks?\b|months?\b|years?\b|items?\b|units?\b))?/gi)].map(m => {
+    const percent = /^(?:%|percent|per[ \t\u00a0\u202f]+cent)$/i.test(m[3] || '');
+    const prefix = ({'$':'USD','€':'EUR','£':'GBP','₺':'TRY'} as Record<string,string>)[m[1] || ''] || (m[1] || '').toUpperCase();
+    const unit = percent ? `${prefix ? prefix + ':' : ''}%` : (prefix || (m[3] || '').toUpperCase().replace(/S$/, ''));
     return {key:`${normalizeNumber(m[2])}:${unit}`,raw:m[0].trim(),literal:m[2],ambiguous:/^[+-]?\d{1,3}[.,]\d{3}$/.test(m[2])};
   });
 }
