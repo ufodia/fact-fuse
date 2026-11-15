@@ -1,4 +1,4 @@
-export type FindingKind = 'number' | 'date' | 'link' | 'negation' | 'commitment' | 'bound' | 'locked' | 'coverage';
+export type FindingKind = 'number' | 'date' | 'link' | 'negation' | 'commitment' | 'bound' | 'condition' | 'scope' | 'locked' | 'coverage';
 export interface Finding {
   id: string;
   kind: FindingKind;
@@ -46,7 +46,7 @@ function values(s: string, kind: 'number'|'date'|'link'): Value[] {
   const datePattern = /\b(?:\d{4}-\d{2}-\d{2}|\d{1,2}[\/]\d{1,2}[\/]\d{4})\b/g;
   if (kind === 'date') return [...s.matchAll(datePattern)].map(m => ({key:m[0],raw:m[0]}));
   const clean = s.replace(/https?:\/\/[^\s<>"']+/g, '').replace(datePattern, '');
-  return [...clean.matchAll(/([$€£₺]|\b(?:USD|EUR|GBP|TRY))?\s*([+-]?(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)*))(?:\s*(%|USD|EUR|GBP|TRY|kg|mg|km|cm|mm|hours?|days?|weeks?|months?|years?|items?|units?))?/gi)].map(m => {
+  return [...clean.matchAll(/([$€£₺]|\b(?:USD|EUR|GBP|TRY))?\s*([+-]?(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)*))(?:\s*(%|USD\b|EUR\b|GBP\b|TRY\b|kg\b|mg\b|km\b|cm\b|mm\b|tonnes?\b|tons?\b|points?\b|upvotes?\b|hours?\b|days?\b|weeks?\b|months?\b|years?\b|items?\b|units?\b))?/gi)].map(m => {
     const unit = ({'$':'USD','€':'EUR','£':'GBP','₺':'TRY'} as Record<string,string>)[m[1] || ''] || (m[1] || m[3] || '').toUpperCase().replace(/S$/, '');
     return {key:`${normalizeNumber(m[2])}:${unit}`,raw:m[0].trim(),literal:m[2],ambiguous:/^[+-]?\d{1,3}[.,]\d{3}$/.test(m[2])};
   });
@@ -62,6 +62,11 @@ const modality = (s: string) => {
   return hard ? 'firm' : soft ? 'qualified' : 'unmarked';
 };
 const bounds = (s: string) => /\b(?:at least|minimum|no fewer than|en az)\b/i.test(s) ? 'minimum' : /\b(?:at most|maximum|up to|no more than|en fazla)\b/i.test(s) ? 'maximum' : 'unmarked';
+// Explicit markers are a review prompt, not a claim that a condition or scope
+// was actually removed: paraphrases can preserve meaning with different words.
+const markers = (s: string, pattern: RegExp) => [...s.matchAll(pattern)].map(m => ({key:m[0].toLowerCase().replace(/\s+/g,' '),raw:m[0]}));
+const conditionMarkers = (s: string) => markers(s, /\b(?:provided\s+that|subject\s+to|on\s+condition\s+that|unless|if)\b/gi);
+const scopeMarkers = (s: string) => markers(s, /\b(?:within|all|every|each|only)\b/gi);
 
 /** Conservative, monotonic sentence alignment. Low-overlap pairs are left unmatched. */
 function align(a: string[], b: string[]): [number|null,number|null,number][] {
@@ -109,6 +114,10 @@ export function analyze(source: string, rewrite: string, locked: string[] = []):
       if(negative(s)!==negative(r))add('negation','review','Negation needs a second look','The count of explicit negative words changed. Equivalent expressions may produce a false alarm.',s,r,ai,bi);
       if(modality(s)!==modality(r))add('commitment','review','Commitment strength may have shifted',`Source: ${modality(s)}. Rewrite: ${modality(r)}. Check whether possibility became a promise, or a requirement became optional.`,s,r,ai,bi);
       if(bounds(s)!==bounds(r))add('bound','review','A limit or threshold may have changed',`Source bound: ${bounds(s)}. Rewrite bound: ${bounds(r)}.`,s,r,ai,bi);
+      const missingConditions=difference(conditionMarkers(s),conditionMarkers(r));
+      if(missingConditions.length)add('condition','review','A condition marker is missing',`Source-only marker(s): ${missingConditions.map(v=>`“${v.raw}”`).join(', ')}. Review the full sentences: the condition may have been dropped or expressed differently.`,s,r,ai,bi);
+      const missingScope=difference(scopeMarkers(s),scopeMarkers(r));
+      if(missingScope.length)add('scope','review','A scope or timing marker is missing',`Source-only marker(s): ${missingScope.map(v=>`“${v.raw}”`).join(', ')}. Review the full sentences: scope or timing may have changed, or the wording may be equivalent.`,s,r,ai,bi);
     }
   }
   const cleanLocked=[...new Set(locked.map(s=>s.trim()).filter(Boolean))].slice(0,50);

@@ -14,6 +14,29 @@ describe('Fact Fuse',()=>{
   it('does not match unrelated numeric sentences',()=>{const r=analyze('Our shipment contains 10 chairs.','The moon has 10 craters.');expect(r.findings.filter(f=>f.kind==='coverage')).toHaveLength(2);});
   it('detects dates and links independently of numbers',()=>{const r=analyze('Meet on 2026-12-10. See https://example.com/a.','Meet on 2026-12-11. See https://example.com/b.');expect(r.findings.filter(f=>f.kind==='date')).toHaveLength(1);expect(r.findings.filter(f=>f.kind==='link')).toHaveLength(1);expect(r.findings.filter(f=>f.kind==='number')).toHaveLength(0);});
   it('detects changed bounds',()=>expect(analyze('Deliver at most 50 items.','Deliver at least 50 items.').findings.map(f=>f.kind)).toContain('bound'));
+  it('flags missing explicit conditions and retains both sentences as evidence',()=>{
+    for(const marker of ['if the supplier confirms','unless stock runs out','provided that stock arrives','subject to supplier confirmation']){
+      const source=`Delivery by Friday ${marker}.`, rewrite='Delivery by Friday.';
+      const f=analyze(source,rewrite).findings.find(f=>f.kind==='condition');
+      expect(f).toMatchObject({severity:'review',source,rewrite});
+      expect(f?.detail).toContain('expressed differently');
+    }
+  });
+  it('flags missing scope and timing markers for review',()=>{
+    for(const [source,rewrite] of [['All customers receive an update.','Customers receive an update.'],['Reply within 30 days.','Reply in 30 days.']]){
+      const f=analyze(source,rewrite).findings.find(f=>f.kind==='scope');
+      expect(f).toMatchObject({severity:'review',source,rewrite});
+    }
+  });
+  it('does not flag unchanged condition and scope markers',()=>{
+    const text='All customers receive an update within 30 days if the supplier confirms.';
+    expect(analyze(text,text).findings).toHaveLength(0);
+  });
+  it('flags changed known units even when the numeric value is unchanged',()=>{
+    for(const [source,rewrite] of [['The draft had 80 points.','The draft had 80 upvotes.'],['The shipment is up to 5 tonnes.','The shipment is up to 5 kg.']]){
+      expect(analyze(source,rewrite).findings.some(f=>f.kind==='number')).toBe(true);
+    }
+  });
   it('checks locked wording and absent locks',()=>{const r=analyze('The price is fixed.','The price remains fixed.',['price is fixed','missing']);expect(r.findings.filter(f=>f.kind==='locked')).toHaveLength(2);});
   it('preserves untrusted input as plain data',()=>{const t='<img src=x onerror=alert(1)> The total is 40.';expect(analyze(t,t).source).toBe(t);expect(analyze(t,t).findings).toHaveLength(0);});
   it('rejects missing and oversized inputs',()=>{expect(()=>analyze('','x')).toThrow();expect(()=>analyze('x'.repeat(120001),'x')).toThrow();});
