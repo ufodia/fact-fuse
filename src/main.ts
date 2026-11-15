@@ -44,7 +44,7 @@ function render(){
     const button=document.createElement('button');button.className='review-button';button.dataset.finding=f.id;button.textContent=reviewed.has(f.id)?'✓ Reviewed · reopen':'Mark reviewed';button.setAttribute('aria-pressed',String(reviewed.has(f.id)));button.onclick=()=>{reviewed.has(f.id)?reviewed.delete(f.id):reviewed.add(f.id);render();};
     card.append(header,title,description,pair,button);container.append(card);
   }
-  if(focusId&&document.activeElement===document.body){const buttons=[...container.querySelectorAll<HTMLButtonElement>('.review-button')];(buttons.find(b=>b.dataset.finding===focusId)||buttons[Math.min(focusIndex,buttons.length-1)]||el('filter')).focus({preventScroll:true});}
+  if(focusId&&document.activeElement===document.body){const buttons=[...container.querySelectorAll<HTMLButtonElement>('.review-button')],same=buttons.find(b=>b.dataset.finding===focusId);(same||buttons[Math.min(focusIndex,buttons.length-1)]||el('filter')).focus({preventScroll:!!same});}
 }
 function compare(){try{report=analyze(source.value,rewrite.value,locked.value.split(/\r?\n/));reviewed=new Set();el('error').hidden=true;el<HTMLButtonElement>('export').disabled=false;render();}catch(e){el('error').textContent=e instanceof Error?e.message:String(e);el('error').hidden=false;}}
 function sample(key:keyof typeof samples){importVersions.source++;importVersions.rewrite++;const s=samples[key];source.value=s.source;rewrite.value=s.rewrite;locked.value=s.locked.join('\n');compare();}
