@@ -3,6 +3,25 @@ import { analyze,normalizeNumber } from '../src/core';
 describe('Fact Fuse',()=>{
   it('normalizes locale equivalent quantities',()=>{expect(normalizeNumber('1.234,50')).toBe('1234.5');expect(normalizeNumber('1,234.50')).toBe('1234.5');expect(analyze('The total price is 1.234,50 EUR.','The total price is 1,234.50 EUR.').findings).toHaveLength(0);});
   it('catches changed quantities and added quantities',()=>{const r=analyze('Delivery takes 14 days.','Delivery takes 30 days.');expect(r.findings.some(f=>f.kind==='number'&&f.detail.includes('14 days')&&f.detail.includes('30 days'))).toBe(true);});
+  it('finds changed written English quantities and keeps equivalent forms clean',()=>{
+    for(const [a,b] of [['Reply within thirty days.','Reply within sixty days.'],['We support ten users.','We support twenty users.'],['The limit is one hundred and twenty items.','The limit is one hundred and twenty-one items.'],['The contract has a thirty-day deadline.','The contract has a sixty-day deadline.']])expect(analyze(a,b).findings.some(f=>f.kind==='number')).toBe(true);
+    for(const [a,b] of [['Reply within thirty days.','Reply within 30 days.'],['There are a dozen items.','There are 12 items.'],['There are one hundred and twenty items.','There are 120 items.'],['The budget is one million two hundred thousand units.','The budget is 1200000 units.'],['The contract has a thirty-day deadline.','The contract has a 30-day deadline.']])expect(analyze(a,b).findings.filter(f=>f.kind==='number')).toHaveLength(0);
+  });
+  it('preserves negative signs on written quantities',()=>{
+    for(const [a,b] of [['The temperature is minus five degrees.','The temperature is five degrees.'],['The balance is negative twenty dollars.','The balance is twenty dollars.'],['The total is negative one hundred items.','The total is one hundred items.']])expect(analyze(a,b).findings.some(f=>f.kind==='number')).toBe(true);
+    for(const [a,b] of [['The temperature is minus five degrees.','The temperature is -5 degrees.'],['The balance is negative twenty dollars.','The balance is -20 dollars.'],['The total is negative zero.','The total is 0.']])expect(analyze(a,b).findings.filter(f=>f.kind==='number')).toHaveLength(0);
+  });
+  it('matches reordered sentences one-to-one without false coverage warnings',()=>{
+    const a='The shipment contains 10 chairs. The guide is ready tomorrow.';
+    const b='The guide is ready tomorrow. The shipment contains 10 chairs.';
+    expect(analyze(a,b).findings).toHaveLength(0);
+    const changed=analyze(a,'The guide is ready tomorrow. The shipment contains 20 chairs.');
+    expect(changed.findings.filter(f=>f.kind==='number')).toHaveLength(1);
+    expect(changed.findings.filter(f=>f.kind==='coverage')).toHaveLength(0);
+    const repeated='Section 1 confirms a result. Section 2 confirms a result. Section 3 confirms a result.';
+    const shuffled='Section 3 confirms a result. Section 1 confirms a result. Section 2 confirms a result.';
+    expect(analyze(repeated,shuffled).findings).toHaveLength(0);
+  });
   it('detects a changed currency prefix',()=>expect(analyze('The price is EUR 20.','The price is USD 20.').findings.some(f=>f.kind==='number')).toBe(true));
   it('requires review when ambiguous dotted notation becomes an integer',()=>{const r=analyze('The distance is 1.234 km.','The distance is 1234 km.');expect(r.findings).toHaveLength(1);expect(r.findings[0]).toMatchObject({kind:'number',severity:'review',title:'Ambiguous number format'});expect(r.findings[0].detail).toContain('locale is unspecified');});
   it('does not treat swapped ambiguous separators as proven equivalence',()=>{const r=analyze('The distance is 1,234 km.','The distance is 1.234 km.');expect(r.findings.some(f=>f.kind==='number'&&f.severity==='review')).toBe(true);});

@@ -18,6 +18,20 @@ async function getDownload(page,button){
   return {download,content:await readFile(await download.path(),'utf8')};
 }
 
+test('written quantities are flagged while reordered equivalent sentences stay clean',async({page})=>{
+  await page.goto('/');
+  await page.locator('#locked').fill('');
+  await page.locator('#source').fill('Reply within thirty days. The guide is ready tomorrow.');
+  await page.locator('#rewrite').fill('The guide is ready tomorrow. Reply within sixty days.');
+  await page.locator('#compare').click();
+  await expect(page.locator('.finding')).toContainText(['Quantity changed']);
+  await expect(page.locator('.finding').first()).toContainText('thirty days');
+  await expect(page.locator('.finding').first()).toContainText('sixty days');
+  await page.locator('#rewrite').fill('The guide is ready tomorrow. Reply within 30 days.');
+  await page.locator('#compare').click();
+  await expect(page.locator('#open-count')).toHaveText('0');
+});
+
 test('local workbench: analysis, evidence, export and responsive layout',async({page},testInfo)=>{
   const errors=[];
   page.on('pageerror',error=>errors.push(error.message));

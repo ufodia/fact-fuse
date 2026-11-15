@@ -41,7 +41,7 @@ Open the local URL printed by Vite. The **expensive promise** example is ready t
 | Thresholds | Minimum vs maximum expressions | Human review; a limit may have changed |
 | Coverage | Sentences without a lexical match | Human review; omissions, additions, and heavy paraphrases |
 
-Number formatting such as `1.234,50` and `1,234.50` is normalized. Repeated quantities are counted. Text imports support `.txt` and `.md`; report exports are JSON. Input remains in memory until you leave or reload the page.
+Number formatting such as `1.234,50` and `1,234.50` is normalized. Common English written cardinal numbers, including `a dozen`, are compared with digit forms. Repeated quantities are counted. Text imports support `.txt` and `.md`; report exports are JSON. Input remains in memory until you leave or reload the page.
 
 **A clear report is not a guarantee of equivalent meaning.** This is a rule-based review aid, not a factual-truth detector. Read the [method and limitations](docs/limitations.md) before using it for important work.
 

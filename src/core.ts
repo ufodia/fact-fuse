@@ -47,17 +47,41 @@ export function normalizeNumber(raw: string): string {
   return `${negative ? '-' : ''}${integer}${fraction ? '.' + fraction : ''}`;
 }
 interface Value {key: string; raw: string; literal?: string; ambiguous?: boolean}
+const smallNumbers:Record<string,number>={zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90};
+const ones='one|two|three|four|five|six|seven|eight|nine';
+const under100=`(?:zero|${ones}|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[-\\s]+(?:${ones}))?)`;
+const under1000=`(?:(?:${ones})\\s+hundred(?:\\s+(?:and\\s+)?${under100})?|${under100})`;
+const wordNumberPattern=new RegExp(`(?<![\\p{L}\\p{N}])(?:(?:minus|negative)\\s+)?(?:a\\s+dozen|${under1000}(?:\\s+million(?:\\s+(?:and\\s+)?${under1000})?)?(?:\\s+thousand(?:\\s+(?:and\\s+)?${under1000})?)?)(?![\\p{L}\\p{N}])(?:[ \\t\\u00a0\\u202f-]*(%|(?:percent|per[ \\t\\u00a0\\u202f]+cent)\\b(?![ \\t\\u00a0\\u202f-]+points?\\b)|USD\\b|EUR\\b|GBP\\b|TRY\\b|kg\\b|mg\\b|km\\b|cm\\b|mm\\b|tonnes?\\b|tons?\\b|points?\\b|upvotes?\\b|hours?\\b|days?\\b|weeks?\\b|months?\\b|years?\\b|items?\\b|units?\\b))?(?!-[\\p{L}])`,'giu');
+function numberWordsValue(text:string):number{
+  const signed=/^(?:minus|negative)\s+/i.test(text);
+  text=text.replace(/^(?:minus|negative)\s+/i,'');
+  if(/^a\s+dozen$/i.test(text))return signed?-12:12;
+  let total=0,current=0;
+  for(const token of text.toLowerCase().split(/[\s-]+/)){
+    if(token==='and')continue;
+    if(token==='hundred')current*=100;
+    else if(token==='thousand'||token==='million'){total+=current*(token==='million'?1_000_000:1_000);current=0;}
+    else current+=smallNumbers[token]??0;
+  }
+  return signed?-(total+current):total+current;
+}
 function values(s: string, kind: 'number'|'date'|'link'): Value[] {
   if (kind === 'link') return [...s.matchAll(/https?:\/\/[^\s<>"']+/g)].map(m => ({key:m[0].replace(/[.,;)!?]+$/, ''),raw:m[0].replace(/[.,;)!?]+$/, '')}));
   const datePattern = /\b(?:\d{4}-\d{2}-\d{2}|\d{1,2}[\/]\d{1,2}[\/]\d{4})\b/g;
   if (kind === 'date') return [...s.matchAll(datePattern)].map(m => ({key:m[0],raw:m[0]}));
   const clean = s.replace(/https?:\/\/[^\s<>"']+/g, '').replace(datePattern, '');
-  return [...clean.matchAll(/([$€£₺]|\b(?:USD|EUR|GBP|TRY))?\s*([+-]?(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)*))(?:\s*(%|(?:percent|per[ \t\u00a0\u202f]+cent)\b(?![ \t\u00a0\u202f-]+points?\b)|USD\b|EUR\b|GBP\b|TRY\b|kg\b|mg\b|km\b|cm\b|mm\b|tonnes?\b|tons?\b|points?\b|upvotes?\b|hours?\b|days?\b|weeks?\b|months?\b|years?\b|items?\b|units?\b))?/gi)].map(m => {
+  const numeric=[...clean.matchAll(/([$€£₺]|\b(?:USD|EUR|GBP|TRY))?\s*([+-]?(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)*))(?:[ \t\u00a0\u202f-]*(%|(?:percent|per[ \t\u00a0\u202f]+cent)\b(?![ \t\u00a0\u202f-]+points?\b)|USD\b|EUR\b|GBP\b|TRY\b|kg\b|mg\b|km\b|cm\b|mm\b|tonnes?\b|tons?\b|points?\b|upvotes?\b|hours?\b|days?\b|weeks?\b|months?\b|years?\b|items?\b|units?\b))?/gi)].map(m => {
     const percent = /^(?:%|percent|per[ \t\u00a0\u202f]+cent)$/i.test(m[3] || '');
     const prefix = ({'$':'USD','€':'EUR','£':'GBP','₺':'TRY'} as Record<string,string>)[m[1] || ''] || (m[1] || '').toUpperCase();
     const unit = percent ? `${prefix ? prefix + ':' : ''}%` : (prefix || (m[3] || '').toUpperCase().replace(/S$/, ''));
     return {key:`${normalizeNumber(m[2])}:${unit}`,raw:m[0].trim(),literal:m[2],ambiguous:/^[+-]?\d{1,3}[.,]\d{3}$/.test(m[2])};
   });
+  const spelled=[...clean.matchAll(wordNumberPattern)].map(m=>{
+    const unit=(m[1]||'').toUpperCase().replace(/S$/,'').replace(/^PERCENT$|^PER\s+CENT$/,'%');
+    const text=m[1]?m[0].slice(0,m[0].length-m[1].length).trim():m[0];
+    return {key:`${numberWordsValue(text)}:${unit}`,raw:m[0].trim(),literal:text};
+  });
+  return [...numeric,...spelled];
 }
 function difference(a: Value[], b: Value[]): Value[] {
   const counts = new Map<string,number>(); for (const v of b) counts.set(v.key,(counts.get(v.key)||0)+1);
@@ -76,23 +100,31 @@ const markers = (s: string, pattern: RegExp) => [...s.matchAll(pattern)].map(m =
 const conditionMarkers = (s: string) => markers(s, /\b(?:provided\s+that|subject\s+to|on\s+condition\s+that|unless|if)\b/gi);
 const scopeMarkers = (s: string) => markers(s, /\b(?:within|all|every|each|only)\b/gi);
 
-/** Conservative, monotonic sentence alignment. Low-overlap pairs are left unmatched. */
+/** Maximum-weight one-to-one alignment; sentences may move. Low-overlap pairs stay unmatched. */
 function align(a: string[], b: string[]): [number|null,number|null,number][] {
   const aWords=a.map(words),bWords=b.map(words);
-  const score=(i:number,j:number)=>similarity(a[i],b[j],aWords[i],bWords[j]);
-  const scores = Array.from({length:a.length+1},()=>Array(b.length+1).fill(0));
-  const moves = Array.from({length:a.length+1},()=>Array<string>(b.length+1).fill(''));
-  for(let i=1;i<=a.length;i++){scores[i][0]=-i*.2;moves[i][0]='a';}
-  for(let j=1;j<=b.length;j++){scores[0][j]=-j*.2;moves[0][j]='b';}
-  for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++){
-    const sim=score(i-1,j-1);
-    const opts:[number,string][]=[[scores[i-1][j]-.2,'a'],[scores[i][j-1]-.2,'b']];
-    if(sim>=.18)opts.push([scores[i-1][j-1]+sim,'pair']);
-    opts.sort((x,y)=>y[0]-x[0]);[scores[i][j],moves[i][j]]=opts[0];
+  const weights=a.map((s,i)=>b.map((t,j)=>similarity(s,t,aWords[i],bWords[j])));
+  const signatures=(items:string[])=>items.map(s=>values(s,'number').map(v=>v.key).sort().join('|'));
+  const aNumbers=signatures(a),bNumbers=signatures(b);
+  const canonical=(s:string)=>s.normalize('NFKC').toLocaleLowerCase('en').replace(/\s+/g,' ').trim();
+  const aText=a.map(canonical),bText=b.map(canonical);
+  // Hungarian assignment with one zero-weight dummy column per source, so
+  // unmatched sentences remain possible without making the pairing monotonic.
+  const n=a.length,m=b.length+n,u=Array(n+1).fill(0),v=Array(m+1).fill(0),p=Array(m+1).fill(0),way=Array(m+1).fill(0);
+  for(let i=1;i<=n;i++){
+    p[0]=i;let j0=0;const min=Array(m+1).fill(Infinity),used=Array(m+1).fill(false);
+    do{used[j0]=true;const i0=p[j0];let delta=Infinity,j1=0;
+      for(let j=1;j<=m;j++)if(!used[j]){const ai=i0-1,bi=j-1;const sim=j<=b.length?weights[ai][bi]:0;const w=sim>=.18?sim+(aText[ai]===bText[bi] ? .01 : 0)+(aNumbers[ai]&&aNumbers[ai]===bNumbers[bi] ? .001 : 0):0;const cur=-w-u[i0]-v[j];if(cur<min[j]){min[j]=cur;way[j]=j0;}if(min[j]<delta){delta=min[j];j1=j;}}
+      for(let j=0;j<=m;j++)if(used[j]){u[p[j]]+=delta;v[j]-=delta;}else min[j]-=delta;
+      j0=j1;
+    }while(p[j0]!==0);
+    do{const j1=way[j0];p[j0]=p[j1];j0=j1;}while(j0!==0);
   }
-  const pairs:[number|null,number|null,number][]=[];let i=a.length,j=b.length;
-  while(i||j){const m=moves[i][j];if(m==='pair'){pairs.push([--i,--j,score(i,j)]);}else if(m==='a'){pairs.push([--i,null,0]);}else{pairs.push([null,--j,0]);}}
-  return pairs.reverse();
+  const assignment=Array(n).fill(-1),matched=new Set<number>();
+  for(let j=1;j<=b.length;j++)if(p[j]&&weights[p[j]-1][j-1]>=.18){assignment[p[j]-1]=j-1;matched.add(j-1);}
+  const pairs:[number|null,number|null,number][]=assignment.map((j,i)=>j<0?[i,null,0]:[i,j,weights[i][j]]);
+  for(let j=0;j<b.length;j++)if(!matched.has(j))pairs.push([null,j,0]);
+  return pairs;
 }
 
 export function analyze(source: string, rewrite: string, locked: string[] = []): Analysis {
