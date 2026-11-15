@@ -102,6 +102,8 @@ If Fact Fuse saved a price, a promise, or a painful round of proofreading, you c
 
 <a href="https://buymeacoffee.com/ufodia"><img src="docs/assets/coffee-button.svg" alt="Buy Ufodia a coffee" width="220"></a>
 
+You can also [sponsor ufodia on GitHub](https://github.com/sponsors/ufodia).
+
 Reproducible bug reports and anonymized before/after examples are valuable contributions too. Never submit client text or confidential material in a public issue.
 
 ## License
