@@ -13,7 +13,7 @@ Each finding includes:
 | Field | Meaning |
 | --- | --- |
 | `id` | Report-local identifier; not stable across edits |
-| `kind` | `number`, `date`, `link`, `negation`, `commitment`, `bound`, `condition`, `scope`, `locked`, or `coverage` |
+| `kind` | `number`, `date`, `link`, `negation`, `commitment`, `bound`, `condition`, `scope`, `caveat`, `locked`, or `coverage` |
 | `severity` | `check` for observable difference; `review` for interpretation, including changed ambiguous numeric notation |
 | `title`, `detail` | Human-readable description |
 | `source`, `rewrite` | Sentence evidence or protected phrase |

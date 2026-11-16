@@ -1,4 +1,4 @@
-export type FindingKind = 'number' | 'date' | 'link' | 'negation' | 'commitment' | 'bound' | 'condition' | 'scope' | 'locked' | 'coverage';
+export type FindingKind = 'number' | 'date' | 'link' | 'negation' | 'commitment' | 'bound' | 'condition' | 'scope' | 'caveat' | 'locked' | 'coverage';
 export interface Finding {
   id: string;
   kind: FindingKind;
@@ -98,6 +98,10 @@ const bounds = (s: string) => /\b(?:at least|minimum|no fewer than|en az)\b/i.te
 // was actually removed: paraphrases can preserve meaning with different words.
 const markers = (s: string, pattern: RegExp) => [...s.matchAll(pattern)].map(m => ({key:m[0].toLowerCase().replace(/\s+/g,' '),raw:m[0]}));
 const conditionMarkers = (s: string) => markers(s, /\b(?:provided\s+that|subject\s+to|on\s+condition\s+that|unless|if)\b/gi);
+const caveatMarkers = (s: string) => [...s.matchAll(/\b(?:individual\s+)?(?:results?|outcomes?)\s+(?:(?:may|can)\s+)?vary\b/gi)].map(m => ({
+  key: /outcomes?/i.test(m[0]) ? 'outcome-vary' : 'result-vary',
+  raw: m[0],
+}));
 const scopeMarkers = (s: string) => [
   ...markers(s, /\b(?:within|all|every|each|only)\b/gi),
   ...[...s.matchAll(/\bby\s+(?:the\s+)?(?:end|start|beginning)\s+of\b/gi)].map(m => ({
@@ -162,6 +166,8 @@ export function analyze(source: string, rewrite: string, locked: string[] = []):
       if(bounds(s)!==bounds(r))add('bound','review','A limit or threshold may have changed',`Source bound: ${bounds(s)}. Rewrite bound: ${bounds(r)}.`,s,r,ai,bi);
       const missingConditions=difference(conditionMarkers(s),conditionMarkers(r));
       if(missingConditions.length)add('condition','review','A condition marker is missing',`Source-only marker(s): ${missingConditions.map(v=>`“${v.raw}”`).join(', ')}. Review the full sentences: the condition may have been dropped or expressed differently.`,s,r,ai,bi);
+      const sourceOnlyCaveats=difference(caveatMarkers(s),caveatMarkers(r)),rewriteOnlyCaveats=difference(caveatMarkers(r),caveatMarkers(s));
+      if(sourceOnlyCaveats.length||rewriteOnlyCaveats.length)add('caveat','review','A results caveat changed',`Source only: ${sourceOnlyCaveats.map(v=>`“${v.raw}”`).join(', ')||'none.'} Rewrite only: ${rewriteOnlyCaveats.map(v=>`“${v.raw}”`).join(', ')||'none.'} Review whether the caveat changes the strength or limits of the claim.`,s,r,ai,bi);
       const missingScope=difference(scopeMarkers(s),scopeMarkers(r));
       if(missingScope.length)add('scope','review','A scope or timing marker is missing',`Source-only marker(s): ${missingScope.map(v=>`“${v.raw}”`).join(', ')}. Review the full sentences: scope or timing may have changed, or the wording may be equivalent.`,s,r,ai,bi);
     }

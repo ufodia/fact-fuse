@@ -8,6 +8,7 @@ Fact Fuse is a deterministic, local review aid. It does not determine whether th
 - ISO and slash-form dates are compared as exact strings. Natural-language dates and date interpretation are not resolved.
 - Negation and commitment rules are primarily English. A small set of Turkish words and bounds are included for transparent examples; this is not complete Turkish-language analysis.
 - Condition and scope checks flag missing explicit English markers in aligned sentences, including period boundaries such as “by the end of”. Equivalent rewording can raise a false alarm, and rewritten conditions or changes spanning sentences can be missed. These findings require human review.
+- Caveat checks recognize only a few explicit English “results may vary” and “outcomes may vary” forms. Other disclaimers and paraphrases can be missed; matching phrases are review prompts, not legal or semantic judgments.
 - Negative-word counts can change without a meaning change. `Not required` and `optional` are an example. Counts can also stay the same while the scope of negation changes.
 - Protected phrases compare exact occurrences, not paraphrase coverage.
 - Case-sensitive URLs are compared after trimming terminal punctuation. URL equivalence, redirect destinations, and availability are not checked.

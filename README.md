@@ -38,6 +38,7 @@ Open the local URL printed by Vite. The **expensive promise** example is ready t
 | Protected wording | Your exact, case-sensitive phrases | The phrase or its occurrence count changed |
 | Negation | Explicit negative-word counts | Human review; equivalent wording can be flagged |
 | Commitment | Firm vs qualified language | Human review; a possibility may have become a promise |
+| Results caveats | A small set of “results may vary” or “outcomes may vary” phrases | Human review; other disclaimers and paraphrases can be missed |
 | Thresholds | Minimum vs maximum expressions | Human review; a limit may have changed |
 | Coverage | Sentences without a lexical match | Human review; omissions, additions, and heavy paraphrases |
 

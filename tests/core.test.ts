@@ -49,6 +49,14 @@ describe('Fact Fuse',()=>{
   it('does not merge unrelated numbers across line breaks',()=>expect(analyze('There are 1\n250 chairs.','There are 1250 chairs.').findings.length).toBeGreaterThan(0));
   it('tracks repeated values as a multiset',()=>{expect(analyze('The fee is $50 plus $50.','The fee is $50.').findings.some(f=>f.kind==='number')).toBe(true);});
   it('flags dropped negation and strengthened commitments',()=>{const r=analyze('We may deliver tomorrow. We do not charge a fee.','We will deliver tomorrow. We charge a fee.');expect(r.findings.map(f=>f.kind)).toContain('commitment');expect(r.findings.map(f=>f.kind)).toContain('negation');});
+  it('flags changed results caveats and normalizes common variants',()=>{
+    const findings=analyze('This app may help you stick to a budget; results vary.','This app will get your spending under control.').findings;
+    const f=findings.find(f=>f.kind==='caveat');
+    expect(f).toMatchObject({severity:'review',title:'A results caveat changed'});
+    expect(findings.map(f=>f.kind)).toContain('commitment');
+    expect(analyze('Individual results may vary.','Results vary.').findings.filter(f=>f.kind==='caveat')).toHaveLength(0);
+    expect(analyze('Outcomes can vary.','Outcomes may vary.').findings.filter(f=>f.kind==='caveat')).toHaveLength(0);
+  });
   it('does not match unrelated numeric sentences',()=>{const r=analyze('Our shipment contains 10 chairs.','The moon has 10 craters.');expect(r.findings.filter(f=>f.kind==='coverage')).toHaveLength(2);});
   it('detects dates and links independently of numbers',()=>{const r=analyze('Meet on 2026-12-10. See https://example.com/a.','Meet on 2026-12-11. See https://example.com/b.');expect(r.findings.filter(f=>f.kind==='date')).toHaveLength(1);expect(r.findings.filter(f=>f.kind==='link')).toHaveLength(1);expect(r.findings.filter(f=>f.kind==='number')).toHaveLength(0);});
   it('detects changed bounds',()=>expect(analyze('Deliver at most 50 items.','Deliver at least 50 items.').findings.map(f=>f.kind)).toContain('bound'));
