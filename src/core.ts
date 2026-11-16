@@ -51,7 +51,7 @@ const smallNumbers:Record<string,number>={zero:0,one:1,two:2,three:3,four:4,five
 const ones='one|two|three|four|five|six|seven|eight|nine';
 const under100=`(?:zero|${ones}|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[-\\s]+(?:${ones}))?)`;
 const under1000=`(?:(?:${ones})\\s+hundred(?:\\s+(?:and\\s+)?${under100})?|${under100})`;
-const wordNumberPattern=new RegExp(`(?<![\\p{L}\\p{N}])(?:(?:minus|negative)\\s+)?(?:a\\s+dozen|${under1000}(?:\\s+million(?:\\s+(?:and\\s+)?${under1000})?)?(?:\\s+thousand(?:\\s+(?:and\\s+)?${under1000})?)?)(?![\\p{L}\\p{N}])(?:[ \\t\\u00a0\\u202f-]*(%|(?:percent|per[ \\t\\u00a0\\u202f]+cent)\\b(?![ \\t\\u00a0\\u202f-]+points?\\b)|USD\\b|EUR\\b|GBP\\b|TRY\\b|kg\\b|mg\\b|km\\b|cm\\b|mm\\b|tonnes?\\b|tons?\\b|points?\\b|upvotes?\\b|hours?\\b|days?\\b|weeks?\\b|months?\\b|years?\\b|items?\\b|units?\\b))?(?!-[\\p{L}])`,'giu');
+const wordNumberPattern=new RegExp(`(?<![\\p{L}\\p{N}])(?:(?:minus|negative)\\s+)?(?:a\\s+dozen|${under1000}(?:\\s+million(?:\\s+(?:and\\s+)?${under1000})?)?(?:\\s+thousand(?:\\s+(?:and\\s+)?${under1000})?)?)(?![\\p{L}\\p{N}])(?:[ \\t\\u00a0\\u202f-]*(%|(?:percent|per[ \\t\\u00a0\\u202f]+cent)\\b(?![ \\t\\u00a0\\u202f-]+points?\\b)|USD\\b|EUR\\b|GBP\\b|TRY\\b|kg\\b|mg\\b|km\\b|cm\\b|mm\\b|tonnes?\\b|tons?\\b|points?\\b|upvotes?\\b|hours?\\b|business[ \\t\\u00a0\\u202f]+days?\\b|days?\\b|weeks?\\b|months?\\b|years?\\b|items?\\b|units?\\b))?(?!-[\\p{L}])`,'giu');
 function numberWordsValue(text:string):number{
   const signed=/^(?:minus|negative)\s+/i.test(text);
   text=text.replace(/^(?:minus|negative)\s+/i,'');
@@ -70,7 +70,7 @@ function values(s: string, kind: 'number'|'date'|'link'): Value[] {
   const datePattern = /\b(?:\d{4}-\d{2}-\d{2}|\d{1,2}[\/]\d{1,2}[\/]\d{4})\b/g;
   if (kind === 'date') return [...s.matchAll(datePattern)].map(m => ({key:m[0],raw:m[0]}));
   const clean = s.replace(/https?:\/\/[^\s<>"']+/g, '').replace(datePattern, '');
-  const numeric=[...clean.matchAll(/([$€£₺]|\b(?:USD|EUR|GBP|TRY))?\s*([+-]?(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)*))(?:[ \t\u00a0\u202f-]*(%|(?:percent|per[ \t\u00a0\u202f]+cent)\b(?![ \t\u00a0\u202f-]+points?\b)|USD\b|EUR\b|GBP\b|TRY\b|kg\b|mg\b|km\b|cm\b|mm\b|tonnes?\b|tons?\b|points?\b|upvotes?\b|hours?\b|days?\b|weeks?\b|months?\b|years?\b|items?\b|units?\b))?/gi)].map(m => {
+  const numeric=[...clean.matchAll(/([$€£₺]|\b(?:USD|EUR|GBP|TRY))?\s*([+-]?(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)*))(?:[ \t\u00a0\u202f-]*(%|(?:percent|per[ \t\u00a0\u202f]+cent)\b(?![ \t\u00a0\u202f-]+points?\b)|USD\b|EUR\b|GBP\b|TRY\b|kg\b|mg\b|km\b|cm\b|mm\b|tonnes?\b|tons?\b|points?\b|upvotes?\b|hours?\b|business[ \t\u00a0\u202f]+days?\b|days?\b|weeks?\b|months?\b|years?\b|items?\b|units?\b))?/gi)].map(m => {
     const percent = /^(?:%|percent|per[ \t\u00a0\u202f]+cent)$/i.test(m[3] || '');
     const prefix = ({'$':'USD','€':'EUR','£':'GBP','₺':'TRY'} as Record<string,string>)[m[1] || ''] || (m[1] || '').toUpperCase();
     const unit = percent ? `${prefix ? prefix + ':' : ''}%` : (prefix || (m[3] || '').toUpperCase().replace(/S$/, ''));
@@ -98,7 +98,13 @@ const bounds = (s: string) => /\b(?:at least|minimum|no fewer than|en az)\b/i.te
 // was actually removed: paraphrases can preserve meaning with different words.
 const markers = (s: string, pattern: RegExp) => [...s.matchAll(pattern)].map(m => ({key:m[0].toLowerCase().replace(/\s+/g,' '),raw:m[0]}));
 const conditionMarkers = (s: string) => markers(s, /\b(?:provided\s+that|subject\s+to|on\s+condition\s+that|unless|if)\b/gi);
-const scopeMarkers = (s: string) => markers(s, /\b(?:within|all|every|each|only)\b/gi);
+const scopeMarkers = (s: string) => [
+  ...markers(s, /\b(?:within|all|every|each|only)\b/gi),
+  ...[...s.matchAll(/\bby\s+(?:the\s+)?(?:end|start|beginning)\s+of\b/gi)].map(m => ({
+    key: m[0].toLowerCase().replace(/\bthe\s+/i, '').replace(/\s+/g, ' '),
+    raw: m[0],
+  })),
+];
 
 /** Maximum-weight one-to-one alignment; sentences may move. Low-overlap pairs stay unmatched. */
 function align(a: string[], b: string[]): [number|null,number|null,number][] {

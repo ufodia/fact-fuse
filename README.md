@@ -32,7 +32,7 @@ Open the local URL printed by Vite. The **expensive promise** example is ready t
 
 | Check | What it observes | Interpretation |
 | --- | --- | --- |
-| Quantities | Normalized numbers, supported currencies/units, occurrence counts | A token-level difference to inspect |
+| Quantities | Normalized numbers, supported currencies/units, occurrence counts | A token-level difference to inspect; business days and calendar days are distinct units |
 | Dates | ISO dates and slash-form dates | Exact date-token comparison; ambiguous dates remain ambiguous |
 | Links | HTTP(S) URLs and repeated occurrences | A link was added, removed, or changed |
 | Protected wording | Your exact, case-sensitive phrases | The phrase or its occurrence count changed |

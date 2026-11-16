@@ -66,12 +66,20 @@ describe('Fact Fuse',()=>{
       expect(f).toMatchObject({severity:'review',source,rewrite});
     }
   });
+  it('flags a changed relative deadline boundary and normalizes an optional article',()=>{
+    const source='The invoice is due by the end of the month.';
+    const rewrite='The invoice is due this month.';
+    const f=analyze(source,rewrite).findings.find(f=>f.kind==='scope');
+    expect(f).toMatchObject({severity:'review',source,rewrite});
+    expect(f?.detail).toContain('by the end of');
+    expect(analyze('The invoice is due by end of the month.','The invoice is due by the end of the month.').findings.filter(f=>f.kind==='scope')).toHaveLength(0);
+  });
   it('does not flag unchanged condition and scope markers',()=>{
     const text='All customers receive an update within 30 days if the supplier confirms.';
     expect(analyze(text,text).findings).toHaveLength(0);
   });
   it('flags changed known units even when the numeric value is unchanged',()=>{
-    for(const [source,rewrite] of [['The draft had 80 points.','The draft had 80 upvotes.'],['The shipment is up to 5 tonnes.','The shipment is up to 5 kg.']]){
+    for(const [source,rewrite] of [['The draft had 80 points.','The draft had 80 upvotes.'],['The shipment is up to 5 tonnes.','The shipment is up to 5 kg.'],['We respond within 5 business days.','We respond within 5 days.']]){
       expect(analyze(source,rewrite).findings.some(f=>f.kind==='number')).toBe(true);
     }
   });
