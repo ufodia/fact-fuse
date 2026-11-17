@@ -10,6 +10,8 @@ Typing in a field, selecting another file for that field, or loading a sample su
 
 Put each phrase on its own line. Exact wording is case-sensitive and Unicode-normalized to NFC. A phrase missing from the source produces a review finding. Up to 50 distinct, non-empty phrases are considered. Protected wording is an exact-text check, not a semantic lock inside the AI provider.
 
+A practical starting point is 3–5 phrases that would change a decision if they moved. Add another only if a real rewrite slips past without it; this is guidance, not a limit.
+
 ## Compare and decide
 
 Select **Compare drafts**. Orange findings show observable token differences; amber findings ask for language review. Read both evidence snippets and the full drafts. Select **Mark reviewed** after deciding whether the change is acceptable. This only records your review; it does not modify either draft.
