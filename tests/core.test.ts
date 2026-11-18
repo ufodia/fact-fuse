@@ -59,7 +59,11 @@ describe('Fact Fuse',()=>{
   });
   it('does not match unrelated numeric sentences',()=>{const r=analyze('Our shipment contains 10 chairs.','The moon has 10 craters.');expect(r.findings.filter(f=>f.kind==='coverage')).toHaveLength(2);});
   it('detects dates and links independently of numbers',()=>{const r=analyze('Meet on 2026-12-10. See https://example.com/a.','Meet on 2026-12-11. See https://example.com/b.');expect(r.findings.filter(f=>f.kind==='date')).toHaveLength(1);expect(r.findings.filter(f=>f.kind==='link')).toHaveLength(1);expect(r.findings.filter(f=>f.kind==='number')).toHaveLength(0);});
-  it('detects changed bounds',()=>expect(analyze('Deliver at most 50 items.','Deliver at least 50 items.').findings.map(f=>f.kind)).toContain('bound'));
+  it('detects changed bounds and a dropped upper limit',()=>{
+    expect(analyze('Deliver at most 50 items.','Deliver at least 50 items.').findings.map(f=>f.kind)).toContain('bound');
+    expect(analyze('We may deliver up to 500 units.','We may deliver 500 units.').findings.some(f=>f.kind==='bound')).toBe(true);
+    expect(analyze('We may deliver up to 500 units.','We may deliver up to 500 units.').findings.filter(f=>f.kind==='bound')).toHaveLength(0);
+  });
   it('flags missing explicit conditions and retains both sentences as evidence',()=>{
     for(const marker of ['if the supplier confirms','unless stock runs out','provided that stock arrives','subject to supplier confirmation']){
       const source=`Delivery by Friday ${marker}.`, rewrite='Delivery by Friday.';
