@@ -94,7 +94,7 @@ const modality = (s: string) => {
   return hard ? 'firm' : soft ? 'qualified' : 'unmarked';
 };
 const bounds = (s: string) => /\b(?:at least|minimum|no fewer than|en az)\b/i.test(s) ? 'minimum' : /\b(?:at most|maximum|up to|no more than|en fazla)\b/i.test(s) ? 'maximum' : 'unmarked';
-const ignoredLabels = new Set(['a','an','and','after','all','also','any','as','at','before','but','by','each','every','for','from','if','in','it','our','so','that','the','then','these','they','this','those','we','when','with','your']);
+const ignoredLabels = new Set(['a','an','and','after','all','also','any','as','at','before','but','by','each','every','for','from','if','in','it','our','so','start','starts','that','the','then','these','they','this','those','we','when','with','your']);
 const labelTokens = (s: string) => [...s.matchAll(/\b[\p{Lu}][\p{L}\p{N}_-]+\b/gu)].map(m => ({key:m[0].toLocaleLowerCase('en'),label:m[0],start:m.index ?? 0})).filter(m => !ignoredLabels.has(m.key));
 function changedQuantityAssignments(source: string, rewrite: string): string[] {
   const sourceLabels = labelTokens(source), rewriteLabels = labelTokens(rewrite);
@@ -123,6 +123,7 @@ function changedQuantityAssignments(source: string, rewrite: string): string[] {
     const tokens = labelTokens(s);
     const found = new Map<string,Value[]>();
     for (const [from,to] of ranges) {
+      if (/\b(?:half|quarter)\b/i.test(s.slice(from,to))) continue;
       const localLabels = tokens.filter(m => m.start >= from && m.start < to && labels.has(m.key));
       const localQuantities = quantities.filter(v => v.start !== undefined && v.start >= from && v.start < to);
       if (localLabels.length !== 1 || localQuantities.length !== 1) continue;

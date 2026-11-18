@@ -58,8 +58,20 @@ describe('Fact Fuse',()=>{
   it('keeps unchanged label assignments clean when clauses are reordered',()=>{
     expect(analyze('Basic has 5 seats and Pro has 10 seats.','Pro has 10 seats and Basic has 5 seats.').findings).toHaveLength(0);
   });
+  it('reviews written quantities without splitting their internal “and”',()=>{
+    const r=analyze('Basic has one hundred and twenty seats and Pro has ten seats.','Basic has ten seats and Pro has one hundred and twenty seats.');
+    expect(r.findings.find(f=>f.title==='Quantity association may have changed')?.detail).toContain('one hundred and twenty');
+  });
   it('does not infer a label/value assignment from clauses with ambiguous quantities',()=>{
     const r=analyze('The Basic and Pro plans have 5 and 10 seats.','The Pro and Basic plans have 10 and 5 seats.');
+    expect(r.findings.some(f=>f.title==='Quantity association may have changed')).toBe(false);
+  });
+  it('does not treat a sentence-initial verb as a quantity label',()=>{
+    const r=analyze('Start with 5 cases and Pro has 10 cases.','Start with 10 cases and Pro has 5 cases.');
+    expect(r.findings.some(f=>f.title==='Quantity association may have changed')).toBe(false);
+  });
+  it('does not infer assignments from unsupported half or quarter quantities',()=>{
+    const r=analyze('Basic has one and a half seats and Pro has ten seats.','Basic has ten seats and Pro has one and a half seats.');
     expect(r.findings.some(f=>f.title==='Quantity association may have changed')).toBe(false);
   });
   it('flags dropped negation and strengthened commitments',()=>{const r=analyze('We may deliver tomorrow. We do not charge a fee.','We will deliver tomorrow. We charge a fee.');expect(r.findings.map(f=>f.kind)).toContain('commitment');expect(r.findings.map(f=>f.kind)).toContain('negation');});
