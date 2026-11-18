@@ -48,6 +48,20 @@ describe('Fact Fuse',()=>{
   });
   it('does not merge unrelated numbers across line breaks',()=>expect(analyze('There are 1\n250 chairs.','There are 1250 chairs.').findings.length).toBeGreaterThan(0));
   it('tracks repeated values as a multiset',()=>{expect(analyze('The fee is $50 plus $50.','The fee is $50.').findings.some(f=>f.kind==='number')).toBe(true);});
+  it('reviews quantities reassigned between explicit labels',()=>{
+    const r=analyze('Basic has 5 seats and Pro has 10 seats.','Basic has 10 seats and Pro has 5 seats.');
+    const f=r.findings.find(f=>f.title==='Quantity association may have changed');
+    expect(f).toMatchObject({kind:'number',severity:'review'});
+    expect(f?.detail).toContain('Basic');
+    expect(f?.detail).toContain('Pro');
+  });
+  it('keeps unchanged label assignments clean when clauses are reordered',()=>{
+    expect(analyze('Basic has 5 seats and Pro has 10 seats.','Pro has 10 seats and Basic has 5 seats.').findings).toHaveLength(0);
+  });
+  it('does not infer a label/value assignment from clauses with ambiguous quantities',()=>{
+    const r=analyze('The Basic and Pro plans have 5 and 10 seats.','The Pro and Basic plans have 10 and 5 seats.');
+    expect(r.findings.some(f=>f.title==='Quantity association may have changed')).toBe(false);
+  });
   it('flags dropped negation and strengthened commitments',()=>{const r=analyze('We may deliver tomorrow. We do not charge a fee.','We will deliver tomorrow. We charge a fee.');expect(r.findings.map(f=>f.kind)).toContain('commitment');expect(r.findings.map(f=>f.kind)).toContain('negation');});
   it('flags changed results caveats and normalizes common variants',()=>{
     const findings=analyze('This app may help you stick to a budget; results vary.','This app will get your spending under control.').findings;

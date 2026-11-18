@@ -46,7 +46,7 @@ export function normalizeNumber(raw: string): string {
   const negative = match[1] === '-' && (integer !== '0' || fraction !== '');
   return `${negative ? '-' : ''}${integer}${fraction ? '.' + fraction : ''}`;
 }
-interface Value {key: string; raw: string; literal?: string; ambiguous?: boolean}
+interface Value {key: string; raw: string; literal?: string; ambiguous?: boolean; start?: number}
 const smallNumbers:Record<string,number>={zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90};
 const ones='one|two|three|four|five|six|seven|eight|nine';
 const under100=`(?:zero|${ones}|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[-\\s]+(?:${ones}))?)`;
@@ -69,17 +69,17 @@ function values(s: string, kind: 'number'|'date'|'link'): Value[] {
   if (kind === 'link') return [...s.matchAll(/https?:\/\/[^\s<>"']+/g)].map(m => ({key:m[0].replace(/[.,;)!?]+$/, ''),raw:m[0].replace(/[.,;)!?]+$/, '')}));
   const datePattern = /\b(?:\d{4}-\d{2}-\d{2}|\d{1,2}[\/]\d{1,2}[\/]\d{4})\b/g;
   if (kind === 'date') return [...s.matchAll(datePattern)].map(m => ({key:m[0],raw:m[0]}));
-  const clean = s.replace(/https?:\/\/[^\s<>"']+/g, '').replace(datePattern, '');
+  const clean = s.replace(/https?:\/\/[^\s<>"']+/g, m => ' '.repeat(m.length)).replace(datePattern, m => ' '.repeat(m.length));
   const numeric=[...clean.matchAll(/([$€£₺]|\b(?:USD|EUR|GBP|TRY))?\s*([+-]?(?:\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)*))(?:[ \t\u00a0\u202f-]*(%|(?:percent|per[ \t\u00a0\u202f]+cent)\b(?![ \t\u00a0\u202f-]+points?\b)|USD\b|EUR\b|GBP\b|TRY\b|kg\b|mg\b|km\b|cm\b|mm\b|tonnes?\b|tons?\b|points?\b|upvotes?\b|hours?\b|business[ \t\u00a0\u202f]+days?\b|days?\b|weeks?\b|months?\b|years?\b|items?\b|units?\b))?/gi)].map(m => {
     const percent = /^(?:%|percent|per[ \t\u00a0\u202f]+cent)$/i.test(m[3] || '');
     const prefix = ({'$':'USD','€':'EUR','£':'GBP','₺':'TRY'} as Record<string,string>)[m[1] || ''] || (m[1] || '').toUpperCase();
     const unit = percent ? `${prefix ? prefix + ':' : ''}%` : (prefix || (m[3] || '').toUpperCase().replace(/S$/, ''));
-    return {key:`${normalizeNumber(m[2])}:${unit}`,raw:m[0].trim(),literal:m[2],ambiguous:/^[+-]?\d{1,3}[.,]\d{3}$/.test(m[2])};
+    return {key:`${normalizeNumber(m[2])}:${unit}`,raw:m[0].trim(),literal:m[2],ambiguous:/^[+-]?\d{1,3}[.,]\d{3}$/.test(m[2]),start:m.index ?? 0};
   });
   const spelled=[...clean.matchAll(wordNumberPattern)].map(m=>{
     const unit=(m[1]||'').toUpperCase().replace(/S$/,'').replace(/^PERCENT$|^PER\s+CENT$/,'%');
     const text=m[1]?m[0].slice(0,m[0].length-m[1].length).trim():m[0];
-    return {key:`${numberWordsValue(text)}:${unit}`,raw:m[0].trim(),literal:text};
+    return {key:`${numberWordsValue(text)}:${unit}`,raw:m[0].trim(),literal:text,start:m.index ?? 0};
   });
   return [...numeric,...spelled];
 }
@@ -94,6 +94,50 @@ const modality = (s: string) => {
   return hard ? 'firm' : soft ? 'qualified' : 'unmarked';
 };
 const bounds = (s: string) => /\b(?:at least|minimum|no fewer than|en az)\b/i.test(s) ? 'minimum' : /\b(?:at most|maximum|up to|no more than|en fazla)\b/i.test(s) ? 'maximum' : 'unmarked';
+const ignoredLabels = new Set(['a','an','and','after','all','also','any','as','at','before','but','by','each','every','for','from','if','in','it','our','so','that','the','then','these','they','this','those','we','when','with','your']);
+const labelTokens = (s: string) => [...s.matchAll(/\b[\p{Lu}][\p{L}\p{N}_-]+\b/gu)].map(m => ({key:m[0].toLocaleLowerCase('en'),label:m[0],start:m.index ?? 0})).filter(m => !ignoredLabels.has(m.key));
+function changedQuantityAssignments(source: string, rewrite: string): string[] {
+  const sourceLabels = labelTokens(source), rewriteLabels = labelTokens(rewrite);
+  const rewriteKeys = new Set(rewriteLabels.map(m => m.key));
+  const common = new Map(sourceLabels.filter(m => rewriteKeys.has(m.key)).map(m => [m.key,m.label]));
+  if (common.size < 2) return [];
+  const assignments = (s: string, labels: Set<string>) => {
+    const matches = [...s.matchAll(/;|\s+\b(?:and|or)\b\s+/gi)];
+    const separators = matches.filter(m => {
+      if (m[0] === ';') return true;
+      const index = m.index ?? 0;
+      const previous = s.slice(0,index).trimEnd().split(/\s+/).pop()?.toLowerCase() || '';
+      const next = s.slice(index + m[0].length).trimStart().split(/\s+/)[0]?.toLowerCase() || '';
+      const numberWord = (word: string) => Object.hasOwn(smallNumbers,word) || ['hundred','thousand','million','dozen'].includes(word);
+      return !numberWord(previous) && !numberWord(next);
+    });
+    const ranges: [number,number][] = [];
+    let start = 0;
+    for (const separator of separators) {
+      const index = separator.index ?? 0;
+      ranges.push([start,index]);
+      start = index + separator[0].length;
+    }
+    ranges.push([start,s.length]);
+    const quantities = values(s,'number');
+    const tokens = labelTokens(s);
+    const found = new Map<string,Value[]>();
+    for (const [from,to] of ranges) {
+      const localLabels = tokens.filter(m => m.start >= from && m.start < to && labels.has(m.key));
+      const localQuantities = quantities.filter(v => v.start !== undefined && v.start >= from && v.start < to);
+      if (localLabels.length !== 1 || localQuantities.length !== 1) continue;
+      const bucket = found.get(localLabels[0].key) || [];
+      bucket.push(localQuantities[0]);
+      found.set(localLabels[0].key,bucket);
+    }
+    return found;
+  };
+  const before = assignments(source,new Set(common.keys()));
+  const after = assignments(rewrite,new Set(common.keys()));
+  const changed = [...common].filter(([key]) => before.get(key)?.length === 1 && after.get(key)?.length === 1 && before.get(key)![0].key !== after.get(key)![0].key);
+  if (changed.length < 2) return [];
+  return changed.map(([key,label]) => `${label}: “${before.get(key)![0].raw}” → “${after.get(key)![0].raw}”`);
+}
 // Explicit markers are a review prompt, not a claim that a condition or scope
 // was actually removed: paraphrases can preserve meaning with different words.
 const markers = (s: string, pattern: RegExp) => [...s.matchAll(pattern)].map(m => ({key:m[0].toLowerCase().replace(/\s+/g,' '),raw:m[0]}));
@@ -158,6 +202,8 @@ export function analyze(source: string, rewrite: string, locked: string[] = []):
         const literals=(items:Value[])=>items.map(v=>({...v,key:`${v.literal}:${v.key}`}));
         const changed=[...difference(literals(av),literals(bv)),...difference(literals(bv),literals(av))].filter(v=>v.ambiguous);
         if(changed.length)add('number','review','Ambiguous number format',`Review ${[...new Set(changed.map(v=>`“${v.literal}”`))].join(', ')}: a lone dot or comma followed by three digits can be a decimal or a thousands separator. The locale is unspecified, so matching normalized values does not establish equivalence.`,s,r,ai,bi);
+        const moved = changedQuantityAssignments(s,r);
+        if(moved.length)add('number','review','Quantity association may have changed',`In short clauses with one shared capitalized label and one quantity, the label/value pairing differs: ${moved.join('; ')}. Check whether each quantity still belongs to the same item or plan.`,s,r,ai,bi);
       }
     }
     if(ai!==null&&bi!==null){
