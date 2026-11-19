@@ -117,9 +117,22 @@ describe('Fact Fuse',()=>{
     expect(analyze(text,text).findings).toHaveLength(0);
   });
   it('flags changed known units even when the numeric value is unchanged',()=>{
-    for(const [source,rewrite] of [['The draft had 80 points.','The draft had 80 upvotes.'],['The shipment is up to 5 tonnes.','The shipment is up to 5 kg.'],['We respond within 5 business days.','We respond within 5 days.']]){
+    for(const [source,rewrite] of [['The draft had 80 points.','The draft had 80 upvotes.'],['The shipment is up to 5 tonnes.','The shipment is up to 5 kg.'],['We respond within 5 business days.','We respond within 5 days.'],['We respond within 30 business days.','We respond within 30 days.']]){
       expect(analyze(source,rewrite).findings.some(f=>f.kind==='number')).toBe(true);
     }
+  });
+  it('flags added or changed scope qualifiers for human review',()=>{
+    for(const [source,rewrite,sourceOnly,rewriteOnly] of [
+      ['Updates apply to selected plans.','Updates apply to all plans.','selected','all'],
+      ['Updates apply to all plans.','Updates apply to selected plans.','all','selected'],
+      ['Updates apply to plans.','Updates apply to all plans.','none.','all'],
+    ]){
+      const f=analyze(source,rewrite).findings.find(f=>f.kind==='scope');
+      expect(f).toMatchObject({severity:'review',source,rewrite});
+      expect(f?.detail).toContain(sourceOnly==='none.'?'Source only: none.':`Source only: “${sourceOnly}”`);
+      expect(f?.detail).toContain(rewriteOnly==='none.'?'Rewrite only: none.':`Rewrite only: “${rewriteOnly}”`);
+    }
+    expect(analyze('Updates apply to selected plans.','Updates apply to selected plans.').findings.filter(f=>f.kind==='scope')).toHaveLength(0);
   });
   it('checks locked wording and absent locks',()=>{const r=analyze('The price is fixed.','The price remains fixed.',['price is fixed','missing']);expect(r.findings.filter(f=>f.kind==='locked')).toHaveLength(2);});
   it('preserves untrusted input as plain data',()=>{const t='<img src=x onerror=alert(1)> The total is 40.';expect(analyze(t,t).source).toBe(t);expect(analyze(t,t).findings).toHaveLength(0);});

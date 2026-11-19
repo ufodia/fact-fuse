@@ -148,7 +148,7 @@ const caveatMarkers = (s: string) => [...s.matchAll(/\b(?:individual\s+)?(?:resu
   raw: m[0],
 }));
 const scopeMarkers = (s: string) => [
-  ...markers(s, /\b(?:within|all|every|each|only)\b/gi),
+  ...markers(s, /\b(?:within|all|every|each|only|selected)\b/gi),
   ...[...s.matchAll(/\bby\s+(?:the\s+)?(?:end|start|beginning)\s+of\b/gi)].map(m => ({
     key: m[0].toLowerCase().replace(/\bthe\s+/i, '').replace(/\s+/g, ' '),
     raw: m[0],
@@ -215,8 +215,8 @@ export function analyze(source: string, rewrite: string, locked: string[] = []):
       if(missingConditions.length)add('condition','review','A condition marker is missing',`Source-only marker(s): ${missingConditions.map(v=>`“${v.raw}”`).join(', ')}. Review the full sentences: the condition may have been dropped or expressed differently.`,s,r,ai,bi);
       const sourceOnlyCaveats=difference(caveatMarkers(s),caveatMarkers(r)),rewriteOnlyCaveats=difference(caveatMarkers(r),caveatMarkers(s));
       if(sourceOnlyCaveats.length||rewriteOnlyCaveats.length)add('caveat','review','A results caveat changed',`Source only: ${sourceOnlyCaveats.map(v=>`“${v.raw}”`).join(', ')||'none.'} Rewrite only: ${rewriteOnlyCaveats.map(v=>`“${v.raw}”`).join(', ')||'none.'} Review whether the caveat changes the strength or limits of the claim.`,s,r,ai,bi);
-      const missingScope=difference(scopeMarkers(s),scopeMarkers(r));
-      if(missingScope.length)add('scope','review','A scope or timing marker is missing',`Source-only marker(s): ${missingScope.map(v=>`“${v.raw}”`).join(', ')}. Review the full sentences: scope or timing may have changed, or the wording may be equivalent.`,s,r,ai,bi);
+      const sourceOnlyScope=difference(scopeMarkers(s),scopeMarkers(r)),rewriteOnlyScope=difference(scopeMarkers(r),scopeMarkers(s));
+      if(sourceOnlyScope.length||rewriteOnlyScope.length)add('scope','review','A scope or timing marker changed',`Source only: ${sourceOnlyScope.map(v=>`“${v.raw}”`).join(', ')||'none.'} Rewrite only: ${rewriteOnlyScope.map(v=>`“${v.raw}”`).join(', ')||'none.'} Review whether scope or timing changed, or the wording may be equivalent.`,s,r,ai,bi);
     }
   }
   const cleanLocked=[...new Set(locked.map(s=>s.trim()).filter(Boolean))].slice(0,50);
