@@ -74,7 +74,7 @@ function values(s: string, kind: 'number'|'date'|'link'): Value[] {
     const percent = /^(?:%|percent|per[ \t\u00a0\u202f]+cent)$/i.test(m[3] || '');
     const prefix = ({'$':'USD','€':'EUR','£':'GBP','₺':'TRY'} as Record<string,string>)[m[1] || ''] || (m[1] || '').toUpperCase();
     const unit = percent ? `${prefix ? prefix + ':' : ''}%` : (prefix || (m[3] || '').toUpperCase().replace(/S$/, ''));
-    return {key:`${normalizeNumber(m[2])}:${unit}`,raw:m[0].trim(),literal:m[2],ambiguous:/^[+-]?\d{1,3}[.,]\d{3}$/.test(m[2]),start:m.index ?? 0};
+    return {key:`${normalizeNumber(m[2])}:${unit}`,raw:m[0].trim(),literal:m[2],ambiguous:/^[+-]?\d{1,3}[.,]\d{3}$/.test(m[2]),start:(m.index ?? 0)+m[0].indexOf(m[0].trim())};
   });
   const spelled=[...clean.matchAll(wordNumberPattern)].map(m=>{
     const unit=(m[1]||'').toUpperCase().replace(/S$/,'').replace(/^PERCENT$|^PER\s+CENT$/,'%');
@@ -154,6 +154,16 @@ const scopeMarkers = (s: string) => [
     raw: m[0],
   })),
 ];
+// Compare the explicit event named after “within [duration] of” as a review
+// prompt. This does not infer that differently worded events mean the same thing.
+const deadlineTriggerMarkers = (s: string): Value[] => values(s,'number').flatMap(value => {
+  if (value.start === undefined || !/(?:hours?|business\s+days?|days?|weeks?|months?|years?)$/i.test(value.raw)) return [];
+  if (!/\bwithin\s+$/i.test(s.slice(0,value.start))) return [];
+  const rest = s.slice(value.start + value.raw.length);
+  const match = /^\s+of\s+([^,.;!?]+)/i.exec(rest);
+  const raw = match?.[1].trim();
+  return raw ? [{key:raw.normalize('NFKC').toLocaleLowerCase('en').replace(/\s+/g,' '),raw}] : [];
+});
 
 /** Maximum-weight one-to-one alignment; sentences may move. Low-overlap pairs stay unmatched. */
 function align(a: string[], b: string[]): [number|null,number|null,number][] {
@@ -217,6 +227,8 @@ export function analyze(source: string, rewrite: string, locked: string[] = []):
       if(sourceOnlyCaveats.length||rewriteOnlyCaveats.length)add('caveat','review','A results caveat changed',`Source only: ${sourceOnlyCaveats.map(v=>`“${v.raw}”`).join(', ')||'none.'} Rewrite only: ${rewriteOnlyCaveats.map(v=>`“${v.raw}”`).join(', ')||'none.'} Review whether the caveat changes the strength or limits of the claim.`,s,r,ai,bi);
       const sourceOnlyScope=difference(scopeMarkers(s),scopeMarkers(r)),rewriteOnlyScope=difference(scopeMarkers(r),scopeMarkers(s));
       if(sourceOnlyScope.length||rewriteOnlyScope.length)add('scope','review','A scope or timing marker changed',`Source only: ${sourceOnlyScope.map(v=>`“${v.raw}”`).join(', ')||'none.'} Rewrite only: ${rewriteOnlyScope.map(v=>`“${v.raw}”`).join(', ')||'none.'} Review whether scope or timing changed, or the wording may be equivalent.`,s,r,ai,bi);
+      const sourceOnlyTriggers=difference(deadlineTriggerMarkers(s),deadlineTriggerMarkers(r)),rewriteOnlyTriggers=difference(deadlineTriggerMarkers(r),deadlineTriggerMarkers(s));
+      if(sourceOnlyTriggers.length||rewriteOnlyTriggers.length)add('scope','review','A deadline trigger may have changed',`Source trigger only: ${sourceOnlyTriggers.map(v=>`“${v.raw}”`).join(', ')||'none.'} Rewrite trigger only: ${rewriteOnlyTriggers.map(v=>`“${v.raw}”`).join(', ')||'none.'} Review whether the same event starts the clock; different wording may be equivalent.`,s,r,ai,bi);
     }
   }
   const cleanLocked=[...new Set(locked.map(s=>s.trim()).filter(Boolean))].slice(0,50);

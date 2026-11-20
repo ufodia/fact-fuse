@@ -40,6 +40,7 @@ Open the local URL printed by Vite. The **expensive promise** example is ready t
 | Commitment | Firm vs qualified language | Human review; a possibility may have become a promise |
 | Results caveats | A small set of “results may vary” or “outcomes may vary” phrases | Human review; other disclaimers and paraphrases can be missed |
 | Thresholds | Minimum vs maximum expressions | Human review; a limit may have changed |
+| Scope and timing | Selected explicit markers and relative-deadline trigger phrases | Human review; changed event wording can be equivalent or missed |
 | Coverage | Sentences without a lexical match | Human review; omissions, additions, and heavy paraphrases |
 
 Number formatting such as `1.234,50` and `1,234.50` is normalized. Common English written cardinal numbers, including `a dozen`, are compared with digit forms. Repeated quantities are counted. Text imports support `.txt` and `.md`; report exports are JSON. Input remains in memory until you leave or reload the page.

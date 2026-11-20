@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added a human-review finding when an explicit relative deadline's event phrase changes.
 - Prevented unfinished text imports from overwriting newer edits, files or samples.
 - Cached sentence tokens during alignment to keep comparisons near the input limits responsive.
 - Added browser regression coverage for superseded imports.

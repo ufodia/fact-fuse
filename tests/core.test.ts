@@ -104,6 +104,24 @@ describe('Fact Fuse',()=>{
       expect(f).toMatchObject({severity:'review',source,rewrite});
     }
   });
+  it('reviews a changed event that starts an explicit relative deadline',()=>{
+    const source='We’ll ship the replacement within 2 days of receiving the return.';
+    const rewrite='We’ll ship the replacement within 2 days of approving the return.';
+    const f=analyze(source,rewrite).findings.find(f=>f.title==='A deadline trigger may have changed');
+    expect(f).toMatchObject({kind:'scope',severity:'review',source,rewrite});
+    expect(f?.detail).toContain('Source trigger only: “receiving the return”');
+    expect(f?.detail).toContain('Rewrite trigger only: “approving the return”');
+  });
+  it('keeps equivalent duration formats clean when the deadline trigger is unchanged',()=>{
+    const r=analyze('We’ll ship within two business days of receiving the return.','We’ll ship within 2 business days of receiving the return.');
+    expect(r.findings.find(f=>f.title==='A deadline trigger may have changed')).toBeUndefined();
+  });
+  it('reviews a removed event phrase while the relative deadline remains',()=>{
+    const r=analyze('Reply within 2 days of receiving the item.','Reply within 2 days.');
+    const f=r.findings.find(f=>f.title==='A deadline trigger may have changed');
+    expect(f?.detail).toContain('Source trigger only: “receiving the item”');
+    expect(f?.detail).toContain('Rewrite trigger only: none.');
+  });
   it('flags a changed relative deadline boundary and normalizes an optional article',()=>{
     const source='The invoice is due by the end of the month.';
     const rewrite='The invoice is due this month.';
