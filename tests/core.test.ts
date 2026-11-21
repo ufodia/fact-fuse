@@ -99,10 +99,11 @@ describe('Fact Fuse',()=>{
     }
   });
   it('flags missing scope and timing markers for review',()=>{
-    for(const [source,rewrite] of [['All customers receive an update.','Customers receive an update.'],['Reply within 30 days.','Reply in 30 days.']]){
+    for(const [source,rewrite] of [['All customers receive an update.','Customers receive an update.'],['Reply within 30 days.','Reply in 30 days.'],['Works offline after the first sync.','Works offline.']]){
       const f=analyze(source,rewrite).findings.find(f=>f.kind==='scope');
       expect(f).toMatchObject({severity:'review',source,rewrite});
     }
+    expect(analyze('Works offline after the first sync.','Works offline after the first sync.').findings).toHaveLength(0);
   });
   it('reviews a changed event that starts an explicit relative deadline',()=>{
     const source='We’ll ship the replacement within 2 days of receiving the return.';

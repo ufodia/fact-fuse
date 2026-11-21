@@ -148,7 +148,7 @@ const caveatMarkers = (s: string) => [...s.matchAll(/\b(?:individual\s+)?(?:resu
   raw: m[0],
 }));
 const scopeMarkers = (s: string) => [
-  ...markers(s, /\b(?:within|all|every|each|only|selected)\b/gi),
+  ...markers(s, /\b(?:within|after|all|every|each|only|selected)\b/gi),
   ...[...s.matchAll(/\bby\s+(?:the\s+)?(?:end|start|beginning)\s+of\b/gi)].map(m => ({
     key: m[0].toLowerCase().replace(/\bthe\s+/i, '').replace(/\s+/g, ' '),
     raw: m[0],
