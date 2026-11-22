@@ -40,6 +40,7 @@ Open the local URL printed by Vite. The **expensive promise** example is ready t
 | Commitment | Firm vs qualified language | Human review; a possibility may have become a promise |
 | Results caveats | A small set of “results may vary” or “outcomes may vary” phrases | Human review; other disclaimers and paraphrases can be missed |
 | Thresholds | Minimum vs maximum expressions | Human review; a limit may have changed |
+| Conditions | A fixed list of explicit English markers | A missing source marker gets an approximate source-span highlight; paraphrases may be missed or flagged |
 | Scope and timing | Selected explicit markers and relative-deadline trigger phrases | Human review; changed event wording can be equivalent or missed |
 | Coverage | Sentences without a lexical match | Human review; omissions, additions, and heavy paraphrases |
 

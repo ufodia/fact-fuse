@@ -9,6 +9,8 @@ export interface Finding {
   rewrite: string;
   sourceSentence: number | null;
   rewriteSentence: number | null;
+  /** Approximate zero-based UTF-16 spans in source evidence for missing condition markers. */
+  sourceHighlights?: {start: number; end: number}[];
 }
 export interface Analysis {
   version: 1;
@@ -141,8 +143,17 @@ function changedQuantityAssignments(source: string, rewrite: string): string[] {
 }
 // Explicit markers are a review prompt, not a claim that a condition or scope
 // was actually removed: paraphrases can preserve meaning with different words.
-const markers = (s: string, pattern: RegExp) => [...s.matchAll(pattern)].map(m => ({key:m[0].toLowerCase().replace(/\s+/g,' '),raw:m[0]}));
+const markers = (s: string, pattern: RegExp) => [...s.matchAll(pattern)].map(m => ({key:m[0].toLowerCase().replace(/\s+/g,' '),raw:m[0],start:m.index??0,end:(m.index??0)+m[0].length}));
 const conditionMarkers = (s: string) => markers(s, /\b(?:provided\s+that|subject\s+to|on\s+condition\s+that|unless|if)\b/gi);
+const conditionSpan = (sentence: string, marker: Value) => {
+  const markerStart=marker.start??sentence.indexOf(marker.raw),markerEnd=markerStart+marker.raw.length;
+  const prefix=sentence.slice(0,markerStart),tail=sentence.slice(markerEnd),terminal=tail.search(/[.!?;]/);
+  const sentenceEnd=terminal<0?sentence.length:markerEnd+terminal;
+  const comma=sentence.indexOf(',',markerEnd);
+  if(!prefix.trim())return {start:0,end:comma>=0&&comma<sentenceEnd?comma+1:sentenceEnd};
+  if(prefix.trimEnd().endsWith(',')&&comma>=0&&comma<sentenceEnd)return {start:markerStart,end:comma};
+  return {start:markerStart,end:sentenceEnd};
+};
 const caveatMarkers = (s: string) => [...s.matchAll(/\b(?:individual\s+)?(?:results?|outcomes?)\s+(?:(?:may|can)\s+)?vary\b/gi)].map(m => ({
   key: /outcomes?/i.test(m[0]) ? 'outcome-vary' : 'result-vary',
   raw: m[0],
@@ -198,7 +209,7 @@ export function analyze(source: string, rewrite: string, locked: string[] = []):
   const a=sentences(source),b=sentences(rewrite);
   if(a.length>400||b.length>400)throw new Error('Use 400 sentences or fewer in each text.');
   const findings:Finding[]=[];const aligned:Analysis['aligned']=[];
-  const add=(kind:FindingKind,severity:Finding['severity'],title:string,detail:string,s:string,r:string,ai:number|null,bi:number|null)=>findings.push({id:`f-${findings.length+1}`,kind,severity,title,detail,source:s,rewrite:r,sourceSentence:ai,rewriteSentence:bi});
+  const add=(kind:FindingKind,severity:Finding['severity'],title:string,detail:string,s:string,r:string,ai:number|null,bi:number|null,sourceHighlights?:Finding['sourceHighlights'])=>findings.push({id:`f-${findings.length+1}`,kind,severity,title,detail,source:s,rewrite:r,sourceSentence:ai,rewriteSentence:bi,...(sourceHighlights?.length?{sourceHighlights}:{})});
   for(const [ai,bi,sim] of align(a,b)){
     const s=ai===null?'':a[ai],r=bi===null?'':b[bi];aligned.push({source:s,rewrite:r,similarity:Number(sim.toFixed(3))});
     if(ai===null||bi===null){
@@ -222,7 +233,7 @@ export function analyze(source: string, rewrite: string, locked: string[] = []):
       if(modality(s)!==modality(r))add('commitment','review','Commitment strength may have shifted',`Source: ${modality(s)}. Rewrite: ${modality(r)}. Check whether possibility became a promise, or a requirement became optional.`,s,r,ai,bi);
       if(bounds(s)!==bounds(r))add('bound','review','A limit or threshold may have changed',`Source bound: ${bounds(s)}. Rewrite bound: ${bounds(r)}.`,s,r,ai,bi);
       const missingConditions=difference(conditionMarkers(s),conditionMarkers(r));
-      if(missingConditions.length)add('condition','review','A condition marker is missing',`Source-only marker(s): ${missingConditions.map(v=>`“${v.raw}”`).join(', ')}. Review the full sentences: the condition may have been dropped or expressed differently.`,s,r,ai,bi);
+      if(missingConditions.length)add('condition','review','A condition marker is missing',`Source-only marker(s): ${missingConditions.map(v=>`“${v.raw}”`).join(', ')}. The SOURCE highlight is an approximate span around the marker, not a parsed clause. Review the full sentences: the condition may have been dropped or expressed differently.`,s,r,ai,bi,missingConditions.map(marker=>conditionSpan(s,marker)));
       const sourceOnlyCaveats=difference(caveatMarkers(s),caveatMarkers(r)),rewriteOnlyCaveats=difference(caveatMarkers(r),caveatMarkers(s));
       if(sourceOnlyCaveats.length||rewriteOnlyCaveats.length)add('caveat','review','A results caveat changed',`Source only: ${sourceOnlyCaveats.map(v=>`“${v.raw}”`).join(', ')||'none.'} Rewrite only: ${rewriteOnlyCaveats.map(v=>`“${v.raw}”`).join(', ')||'none.'} Review whether the caveat changes the strength or limits of the claim.`,s,r,ai,bi);
       const sourceOnlyScope=difference(scopeMarkers(s),scopeMarkers(r)),rewriteOnlyScope=difference(scopeMarkers(r),scopeMarkers(s));

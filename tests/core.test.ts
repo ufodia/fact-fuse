@@ -96,7 +96,14 @@ describe('Fact Fuse',()=>{
       const f=analyze(source,rewrite).findings.find(f=>f.kind==='condition');
       expect(f).toMatchObject({severity:'review',source,rewrite});
       expect(f?.detail).toContain('expressed differently');
+      expect(f?.sourceHighlights?.map(span=>source.slice(span.start,span.end))).toEqual([marker]);
     }
+  });
+  it('highlights the leading condition phrase as an approximate source span',()=>{
+    const source='If the supplier confirms, delivery is by Friday.';
+    const f=analyze(source,'Delivery is by Friday.').findings.find(f=>f.kind==='condition');
+    expect(f?.sourceHighlights?.map(span=>source.slice(span.start,span.end))).toEqual(['If the supplier confirms,']);
+    expect(f?.detail).toContain('not a parsed clause');
   });
   it('flags missing scope and timing markers for review',()=>{
     for(const [source,rewrite] of [['All customers receive an update.','Customers receive an update.'],['Reply within 30 days.','Reply in 30 days.'],['Works offline after the first sync.','Works offline.']]){

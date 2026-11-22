@@ -18,5 +18,6 @@ Each finding includes:
 | `title`, `detail` | Human-readable description |
 | `source`, `rewrite` | Sentence evidence or protected phrase |
 | `sourceSentence`, `rewriteSentence` | Zero-based segmented sentence indices, or `null` |
+| `sourceHighlights` | Optional approximate zero-based UTF-16 spans in the `source` evidence for a missing condition marker; these are display cues, not parsed clause boundaries |
 
 Alignment entries contain the source/rewrite text and a lexical similarity between 0 and 1. That score is an alignment aid, not a probability of correctness. Consumers should reject unsupported `version` values and preserve the limitations text when showing reports.
