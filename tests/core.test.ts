@@ -160,6 +160,15 @@ describe('Fact Fuse',()=>{
     }
     expect(analyze('Updates apply to selected plans.','Updates apply to selected plans.').findings.filter(f=>f.kind==='scope')).toHaveLength(0);
   });
+  it('reviews a removed timing marker when a rewrite keeps the same percentage',()=>{
+    const source='Downloads rose 24% after the update.';
+    const rewrite='The update increased downloads by 24%.';
+    const findings=analyze(source,rewrite).findings;
+    const scope=findings.find(f=>f.kind==='scope');
+    expect(scope).toMatchObject({severity:'review',source,rewrite});
+    expect(scope?.detail).toContain('Source only: “after”');
+    expect(findings.some(f=>f.kind==='number')).toBe(false);
+  });
   it('checks locked wording and absent locks',()=>{const r=analyze('The price is fixed.','The price remains fixed.',['price is fixed','missing']);expect(r.findings.filter(f=>f.kind==='locked')).toHaveLength(2);});
   it('preserves untrusted input as plain data',()=>{const t='<img src=x onerror=alert(1)> The total is 40.';expect(analyze(t,t).source).toBe(t);expect(analyze(t,t).findings).toHaveLength(0);});
   it('rejects missing and oversized inputs',()=>{expect(()=>analyze('','x')).toThrow();expect(()=>analyze('x'.repeat(120001),'x')).toThrow();});
